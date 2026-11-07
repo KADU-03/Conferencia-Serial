@@ -1,0 +1,434 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conferência de Seriais</title>
+<style>
+:root {
+  --bg:#0b1120;
+  --card:#172235;
+  --border:#34445c;
+  --text:#f1f5f9;
+  --muted:#94a3b8;
+  --blue:#3b82f6;
+  --green:#22c55e;
+  --red:#ef4444;
+}
+
+* {
+  box-sizing:border-box;
+}
+
+body {
+  margin:0;
+  padding:20px;
+  background:var(--bg);
+  color:var(--text);
+  font-family:Arial,sans-serif;
+}
+
+main {
+  max-width:850px;
+  margin:auto;
+}
+
+h1 {
+  text-align:center;
+  margin-bottom:8px;
+}
+
+.subtitulo {
+  text-align:center;
+  color:var(--muted);
+  margin-bottom:25px;
+}
+
+.card {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:22px;
+  margin-bottom:20px;
+}
+
+h2 {
+  margin-top:0;
+}
+
+p {
+  color:var(--muted);
+  line-height:1.5;
+}
+
+input,textarea {
+  width:100%;
+  padding:15px;
+  border:2px solid var(--border);
+  border-radius:10px;
+  background:#0b1120;
+  color:white;
+  font-size:17px;
+  outline:none;
+}
+
+input:focus,textarea:focus {
+  border-color:var(--blue);
+}
+
+textarea {
+  min-height:250px;
+  resize:vertical;
+  font-family:monospace;
+  line-height:1.7;
+}
+
+#leitura {
+  font-size:22px;
+  text-align:center;
+  font-weight:bold;
+}
+
+button {
+  border:0;
+  border-radius:9px;
+  padding:13px 20px;
+  background:var(--blue);
+  color:white;
+  font-size:15px;
+  font-weight:bold;
+  cursor:pointer;
+  margin-top:10px;
+}
+
+button:hover {
+  filter:brightness(1.15);
+}
+
+.verde {
+  background:#15803d;
+}
+
+.vermelho {
+  background:#b91c1c;
+}
+
+.botoes {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+
+#resultado {
+  text-align:center;
+  padding:35px 15px;
+  border-radius:12px;
+  background:#334155;
+  margin-top:20px;
+  border:2px solid #475569;
+}
+
+#resultado .titulo {
+  font-size:27px;
+  font-weight:900;
+}
+
+#resultado .codigo {
+  font-size:23px;
+  font-family:monospace;
+  margin-top:12px;
+  overflow-wrap:anywhere;
+}
+
+#resultado.autorizado {
+  background:#065f46;
+  border-color:var(--green);
+}
+
+#resultado.invalido {
+  background:#991b1b;
+  border-color:var(--red);
+  animation:piscar .3s 3;
+}
+
+@keyframes piscar {
+  50% {
+    filter:brightness(1.8);
+  }
+}
+
+#mensagem {
+  font-size:13px;
+  color:#4ade80;
+}
+
+@media(max-width:600px) {
+  body {
+    padding:10px;
+  }
+
+  .card {
+    padding:15px;
+  }
+
+  #resultado .titulo {
+    font-size:21px;
+  }
+
+  #leitura {
+    font-size:17px;
+  }
+}
+</style>
+</head>
+
+<body>
+<main>
+
+<h1>▣ Conferência de Seriais</h1>
+<p class="subtitulo">Sistema de validação por código de barras</p>
+
+<div class="card">
+  <h2>Leitor de código de barras</h2>
+
+  <p>
+    Bipe o código de barras com o coletor.
+    A conferência será automática quando o coletor enviar Enter.
+  </p>
+
+  <input
+    id="leitura"
+    type="text"
+    placeholder="AGUARDANDO LEITURA..."
+    autocomplete="off"
+    spellcheck="false"
+    autofocus
+  >
+
+  <div class="botoes">
+    <button onclick="conferir()">Conferir serial</button>
+  </div>
+
+  <div id="resultado" role="status" aria-live="polite">
+    <div class="titulo">AGUARDANDO LEITURA</div>
+    <div class="codigo">Bipe um código para conferir</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Seriais salvos (<span id="quantidadeLista">0</span>)</h2>
+
+  <p>
+    Os seriais permanecem salvos mesmo depois de fechar
+    ou atualizar a página, desde que os dados do navegador
+    não sejam apagados.
+  </p>
+
+  <textarea
+    id="seriaisSalvos"
+    spellcheck="false"
+    placeholder="EXEMPLOS DE COMO COLOCAR OS SERIAIS:
+
+902625H19505410
+902625H19505404
+902625H19505405
+
+OU SEPARADOS POR VÍRGULA:
+902625H19505410, 902625H19505404
+
+OU POR PONTO:
+902625H19505410.902625H19505404
+
+OU POR PONTO E VÍRGULA:
+902625H19505410; 902625H19505404
+
+OU POR ESPAÇO:
+902625H19505410 902625H19505404"
+  ></textarea>
+
+  <div class="botoes">
+    <button class="verde" onclick="salvarEdicao()">
+      Salvar alterações da lista
+    </button>
+
+    <button class="vermelho" onclick="limparLista()">
+      Limpar seriais
+    </button>
+  </div>
+
+  <p id="mensagem" role="status"></p>
+</div>
+
+</main>
+
+<script>
+"use strict";
+
+const CHAVE = "codigos_autorizados_v1";
+
+const leitura = document.getElementById("leitura");
+const resultado = document.getElementById("resultado");
+const seriaisSalvos = document.getElementById("seriaisSalvos");
+const mensagem = document.getElementById("mensagem");
+const quantidadeLista = document.getElementById("quantidadeLista");
+
+let codigos = new Set();
+let audio = null;
+
+function normalizar(valor) {
+  return String(valor).trim().toUpperCase();
+}
+
+function separarSeriais(texto) {
+  return [...new Set(
+    String(texto)
+      .toUpperCase()
+      .split(/[^A-Z0-9]+/)
+      .filter(Boolean)
+  )];
+}
+
+function atualizarLista() {
+  seriaisSalvos.value = [...codigos].join("\n");
+  quantidadeLista.textContent = codigos.size;
+}
+
+function mostrarMensagem(texto, erro=false) {
+  mensagem.style.color = erro ? "#f87171" : "#4ade80";
+  mensagem.textContent = texto;
+}
+
+function carregar() {
+  try {
+    const dados = JSON.parse(localStorage.getItem(CHAVE) || "[]");
+
+    if (Array.isArray(dados)) {
+      codigos = new Set(
+        dados
+          .map(normalizar)
+          .filter(c => /^[A-Z0-9]+$/.test(c))
+      );
+    }
+  } catch {
+    codigos = new Set();
+  }
+
+  atualizarLista();
+}
+
+function salvarEdicao() {
+  const novos = separarSeriais(seriaisSalvos.value);
+
+  if (!novos.length && codigos.size > 0) {
+    if (!confirm("A lista ficará vazia. Deseja continuar?")) {
+      return;
+    }
+  }
+
+  try {
+    localStorage.setItem(CHAVE, JSON.stringify(novos));
+    codigos = new Set(novos);
+    atualizarLista();
+
+    mostrarMensagem(
+      "Lista salva! " + codigos.size + " seriais cadastrados."
+    );
+
+    leitura.focus();
+  } catch {
+    mostrarMensagem("Erro ao salvar os seriais.", true);
+  }
+}
+
+function limparLista() {
+  if (!confirm("Deseja apagar todos os seriais salvos?")) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(CHAVE, "[]");
+    codigos.clear();
+    atualizarLista();
+    mostrarMensagem("Todos os seriais foram apagados.");
+    leitura.focus();
+  } catch {
+    mostrarMensagem("Erro ao apagar os seriais.", true);
+  }
+}
+
+function tocarSom(autorizado) {
+  try {
+    audio ??= new (
+      window.AudioContext || window.webkitAudioContext
+    )();
+
+    if (audio.state === "suspended") {
+      audio.resume();
+    }
+
+    const oscilador = audio.createOscillator();
+    const ganho = audio.createGain();
+
+    oscilador.type = autorizado ? "sine" : "square";
+    oscilador.frequency.value = autorizado ? 950 : 220;
+
+    const duracao = autorizado ? 0.15 : 0.5;
+
+    ganho.gain.setValueAtTime(0.12, audio.currentTime);
+    ganho.gain.exponentialRampToValueAtTime(
+      0.001,
+      audio.currentTime + duracao
+    );
+
+    oscilador.connect(ganho);
+    ganho.connect(audio.destination);
+
+    oscilador.start();
+    oscilador.stop(audio.currentTime + duracao);
+  } catch {}
+}
+
+function conferir() {
+  const codigo = normalizar(leitura.value);
+
+  if (!codigo) return;
+
+  const autorizado =
+    /^[A-Z0-9]+$/.test(codigo) &&
+    codigos.has(codigo);
+
+  resultado.className = autorizado ? "autorizado" : "invalido";
+  resultado.replaceChildren();
+
+  const titulo = document.createElement("div");
+  titulo.className = "titulo";
+  titulo.textContent = autorizado
+    ? "✓ SERIAL AUTORIZADO"
+    : "✕ SERIAL NÃO AUTORIZADO";
+
+  const textoCodigo = document.createElement("div");
+  textoCodigo.className = "codigo";
+  textoCodigo.textContent = codigo;
+
+  resultado.append(titulo, textoCodigo);
+
+  tocarSom(autorizado);
+
+  leitura.value = "";
+  leitura.focus();
+}
+
+leitura.addEventListener("keydown", evento => {
+  if (evento.key === "Enter") {
+    evento.preventDefault();
+    conferir();
+  }
+});
+
+carregar();
+leitura.focus();
+</script>
+
+</body>
+</html>
